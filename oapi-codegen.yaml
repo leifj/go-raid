@@ -1,0 +1,7 @@
+# Configuration for oapi-codegen
+package: api
+generate:
+  models: true
+  chi-server: true
+  embedded-spec: true
+output: internal/api/generated.go
