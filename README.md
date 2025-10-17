@@ -51,40 +51,53 @@ go-RAiD/
 ### Prerequisites
 
 - Go 1.21 or higher
-- PostgreSQL 14+ (for full implementation)
+- Optional: PostgreSQL 14+ or CockroachDB (for production storage backends)
+- Optional: FoundationDB (for FDB storage backend)
 
-### Installation
+### Quick Start with Makefile
 
-1. Clone this repository:
+This project includes a comprehensive Makefile for easy building and testing. See [`docs/MAKEFILE_GUIDE.md`](docs/MAKEFILE_GUIDE.md) for full documentation.
+
 ```bash
+# Clone the repository
 git clone https://github.com/leifj/go-raid.git
 cd go-raid
-```
 
-2. Install dependencies:
-```bash
-go mod download
-```
+# Show all available commands
+make help
 
-3. Build the application:
-```bash
-go build
-```
+# Install dependencies (minimal - file storage only)
+make deps
 
-### Running
+# Build the application
+make build
 
-Run the development server:
-```bash
-go run main.go
-```
+# Run tests
+make test
 
-Or build and run:
-```bash
-go build
-./go-RAiD
+# Run in development mode (file-git storage)
+make run-dev
 ```
 
 The API will be available at `http://localhost:8080`
+
+### Manual Installation
+
+If you prefer not to use the Makefile:
+
+```bash
+# Install dependencies
+go mod download
+
+# Build minimal binary (file storage only)
+go build -tags noexternal -o bin/raid-server .
+
+# Or build with all storage backends
+go build -o bin/raid-server .
+
+# Run the server
+./bin/raid-server
+```
 
 ### Configuration
 
@@ -141,19 +154,25 @@ export JWT_SECRET=your-secret-key
 - [x] HTTP server with Chi router
 - [x] Route definitions for all endpoints
 - [x] Configuration management
-- [x] Basic handler stubs
+- [x] Storage abstraction layer with three backends (file, file-git, FoundationDB, CockroachDB)
+- [x] RAiD handlers implementation
+- [x] Service point handlers implementation
+- [x] Testing infrastructure with MockRepository
+- [x] Handler unit tests (36.3% coverage)
+- [x] Comprehensive Makefile for building and testing
+- [x] Documentation suite (storage backends, testing plan, quick start guide)
+- [x] Git repository with contribution guidelines
 
 ### 🔄 In Progress
-- [ ] Database integration (PostgreSQL)
-- [ ] RAiD identifier generation logic
-- [ ] Validation layer
-- [ ] Authentication & authorization
-- [ ] Service point management
+- [ ] Storage backend unit tests (file, git, FDB, CockroachDB)
+- [ ] Integration tests with real storage backends
 - [ ] Change history tracking (JSON Patch RFC 6902)
+- [ ] Improve test coverage to 80%+
 
 ### 📋 Planned
-- [ ] Unit tests
-- [ ] Integration tests
+- [ ] Authentication & authorization (JWT, OAuth2/OIDC)
+- [ ] End-to-end tests
+- [ ] CI/CD pipeline (GitHub Actions)
 - [ ] Docker deployment
 - [ ] Kubernetes manifests
 - [ ] API documentation (Swagger UI)
@@ -162,29 +181,51 @@ export JWT_SECRET=your-secret-key
 
 ## Development
 
-### Testing
+### Using the Makefile
 
-Run tests:
+The project includes a comprehensive Makefile. See [`docs/MAKEFILE_GUIDE.md`](docs/MAKEFILE_GUIDE.md) for full documentation.
+
 ```bash
-go test ./...
+# Show all available commands
+make help
+
+# Build the project
+make build
+
+# Run tests
+make test
+
+# Run tests with coverage report
+make test-coverage
+
+# Generate HTML coverage report
+make coverage-html
+
+# Format, vet, and test
+make check
+
+# Run in development mode
+make run-dev
+
+# Clean build artifacts
+make clean
 ```
 
-Run tests with coverage:
-```bash
-go test -cover ./...
-```
+### Manual Testing
 
-### Code Formatting
+If not using the Makefile:
 
-Format code:
 ```bash
+# Run all tests
+go test -tags noexternal -v ./...
+
+# Run tests with coverage
+go test -tags noexternal -cover ./...
+
+# Format code
 go fmt ./...
-```
 
-### Linting
-
-Run linter:
-```bash
+# Run linter (if installed)
 golangci-lint run
 ```
 
@@ -196,6 +237,17 @@ Contributions are welcome! This is a cleanroom implementation, so:
 2. Follow Go best practices and idioms
 3. Add tests for new functionality
 4. Update documentation as needed
+
+See [`CONTRIBUTING.md`](.github/CONTRIBUTING.md) for detailed contribution guidelines.
+
+## Documentation
+
+- **[Quick Start Guide](docs/QUICK_START.md)** - Get started with go-RAiD
+- **[Makefile Guide](docs/MAKEFILE_GUIDE.md)** - Comprehensive guide to the Makefile
+- **[Storage Backends](docs/STORAGE_BACKENDS.md)** - Storage backend options and configuration
+- **[Testing Plan](docs/TESTING_PLAN.md)** - Testing strategy and guidelines
+- **[Implementation Notes](docs/implementation-notes.md)** - Technical implementation details
+- **[Architecture Decisions](docs/architecture-decisions.md)** - Key architectural choices
 
 ## License
 
