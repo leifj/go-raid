@@ -132,7 +132,7 @@ fmt:
 ## vet: Run go vet
 vet:
 	@echo "Running go vet..."
-	$(GOVET) ./...
+	$(GOVET) -tags $(TEST_TAGS) ./...
 	@echo "Vet check passed"
 
 ## lint: Run linter (requires golangci-lint)
