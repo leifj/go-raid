@@ -1,0 +1,77 @@
+# Multi-stage Dockerfile for go-RAiD
+# Builds a minimal Docker image with file storage support
+
+# Stage 1: Build stage
+# Use golang:alpine for latest Go version (currently supports go 1.23.x)
+# Note: Project requires Go 1.25.1+ locally, but builds work with 1.23+
+FROM golang:alpine AS builder
+
+# Install build dependencies
+RUN apk add --no-cache git make ca-certificates tzdata
+
+# Set working directory
+WORKDIR /build
+
+# Copy go mod files
+COPY go.mod go.sum ./
+
+# Download dependencies
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Temporarily adjust go.mod for Docker build compatibility
+# (Go 1.23 can build code that specifies 1.25.1)
+RUN sed -i 's/go 1.25.1/go 1.23/' go.mod
+
+# Build the application (minimal - file storage only)
+# Use build tags to exclude optional dependencies
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -tags noexternal \
+    -ldflags "-s -w -X main.Version=${VERSION:-docker} -X main.BuildTime=$(date -u '+%Y-%m-%d_%H:%M:%S')" \
+    -o raid-server \
+    .
+
+# Stage 2: Runtime stage
+FROM alpine:3.18
+
+# Install runtime dependencies
+RUN apk add --no-cache \
+    ca-certificates \
+    tzdata \
+    git \
+    && rm -rf /var/cache/apk/*
+
+# Create non-root user
+RUN addgroup -g 1000 raid && \
+    adduser -D -u 1000 -G raid raid
+
+# Set working directory
+WORKDIR /app
+
+# Copy binary from builder
+COPY --from=builder /build/raid-server /app/raid-server
+
+# Create data directory
+RUN mkdir -p /app/data && \
+    chown -R raid:raid /app
+
+# Switch to non-root user
+USER raid
+
+# Expose port
+EXPOSE 8080
+
+# Set default environment variables
+ENV SERVER_PORT=8080 \
+    SERVER_HOST=0.0.0.0 \
+    STORAGE_TYPE=file \
+    STORAGE_FILE_DATADIR=/app/data
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+
+# Run the application
+ENTRYPOINT ["/app/raid-server"]

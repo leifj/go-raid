@@ -149,10 +149,10 @@ type RelatedRAiD struct {
 
 // RelatedObject represents a related object with type and categories
 type RelatedObject struct {
-	ID        string      `json:"id"`
-	SchemaURI string      `json:"schemaUri,omitempty"`
-	Type      *IDSchema   `json:"type,omitempty"`
-	Category  []IDSchema  `json:"category,omitempty"`
+	ID        string     `json:"id"`
+	SchemaURI string     `json:"schemaUri,omitempty"`
+	Type      *IDSchema  `json:"type,omitempty"`
+	Category  []IDSchema `json:"category,omitempty"`
 }
 
 // AlternateIdentifier represents an alternate identifier

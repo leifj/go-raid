@@ -1,3 +1,4 @@
+//go:build noexternal
 // +build noexternal
 
 package cockroach

@@ -33,7 +33,19 @@ DOCS_DIR=./docs
 # Version (can be overridden: make build VERSION=1.0.0)
 VERSION?=dev
 
-.PHONY: all build build-minimal build-full test test-coverage test-short clean run help deps deps-full fmt vet lint install docker-build docker-run coverage-html
+# Docker parameters
+DOCKER_IMAGE=go-raid
+DOCKER_TAG=$(VERSION)
+DOCKER_IMAGE_FULL=$(DOCKER_IMAGE):$(DOCKER_TAG)
+DOCKER_IMAGE_MINIMAL=$(DOCKER_IMAGE):$(DOCKER_TAG)-minimal
+DOCKER_IMAGE_LATEST=$(DOCKER_IMAGE):latest
+DOCKER_REGISTRY?=
+DOCKER_COMPOSE=docker-compose
+DOCKER_COMPOSE_FILE=docker-compose.yml
+
+.PHONY: all build build-minimal build-full test test-coverage test-short clean run help deps deps-full fmt vet lint install coverage-html
+.PHONY: docker-build docker-build-minimal docker-build-full docker-build-all docker-run docker-run-full docker-run-git docker-stop docker-clean docker-push docker-push-all
+.PHONY: compose-up compose-down compose-up-full compose-logs compose-ps compose-restart compose-build
 
 # Default target
 all: test build
@@ -198,16 +210,141 @@ install:
 	$(GOBUILD) -tags $(BUILD_TAGS_MINIMAL) $(LDFLAGS) -o $(GOPATH)/bin/$(BINARY_NAME) .
 	@echo "Installed to $(GOPATH)/bin/$(BINARY_NAME)"
 
-## docker-build: Build Docker image
-docker-build:
-	@echo "Building Docker image..."
-	docker build -t go-raid:$(VERSION) -t go-raid:latest .
-	@echo "Docker image built: go-raid:$(VERSION)"
+## docker-build: Build minimal Docker image (file storage only)
+docker-build: docker-build-minimal
 
-## docker-run: Run in Docker container
+## docker-build-minimal: Build minimal Docker image without external dependencies
+docker-build-minimal:
+	@echo "Building minimal Docker image (file storage only)..."
+	docker build \
+		--file Dockerfile \
+		--build-arg VERSION=$(VERSION) \
+		--tag $(DOCKER_IMAGE_MINIMAL) \
+		--tag $(DOCKER_IMAGE):latest-minimal \
+		.
+	@echo "Minimal Docker image built: $(DOCKER_IMAGE_MINIMAL)"
+
+## docker-build-full: Build full Docker image with all storage backends
+docker-build-full:
+	@echo "Building full Docker image (all storage backends)..."
+	docker build \
+		--file Dockerfile.full \
+		--build-arg VERSION=$(VERSION) \
+		--tag $(DOCKER_IMAGE_FULL) \
+		--tag $(DOCKER_IMAGE):latest \
+		.
+	@echo "Full Docker image built: $(DOCKER_IMAGE_FULL)"
+
+## docker-build-all: Build both minimal and full Docker images
+docker-build-all: docker-build-minimal docker-build-full
+	@echo "All Docker images built successfully"
+
+## docker-run: Run minimal Docker container
 docker-run:
-	@echo "Running in Docker container..."
-	docker run -p 8080:8080 -e STORAGE_TYPE=file go-raid:latest
+	@echo "Running minimal Docker container..."
+	docker run --rm -it \
+		-p 8080:8080 \
+		-e STORAGE_TYPE=file \
+		-v $(PWD)/docker-data:/app/data \
+		$(DOCKER_IMAGE):latest-minimal
+
+## docker-run-full: Run full Docker container
+docker-run-full:
+	@echo "Running full Docker container..."
+	docker run --rm -it \
+		-p 8080:8080 \
+		-e STORAGE_TYPE=file \
+		-v $(PWD)/docker-data:/app/data \
+		$(DOCKER_IMAGE):latest
+
+## docker-run-git: Run Docker container with git storage
+docker-run-git:
+	@echo "Running Docker container with git storage..."
+	docker run --rm -it \
+		-p 8080:8080 \
+		-e STORAGE_TYPE=file-git \
+		-e GIT_USER_NAME="RAiD Server" \
+		-e GIT_USER_EMAIL="raid@example.com" \
+		-v $(PWD)/docker-data:/app/data \
+		$(DOCKER_IMAGE):latest-minimal
+
+## docker-stop: Stop all running go-raid containers
+docker-stop:
+	@echo "Stopping all go-raid containers..."
+	@docker ps -q --filter ancestor=$(DOCKER_IMAGE) | xargs -r docker stop
+	@echo "All containers stopped"
+
+## docker-clean: Remove Docker images and containers
+docker-clean:
+	@echo "Cleaning Docker images and containers..."
+	@docker ps -a -q --filter ancestor=$(DOCKER_IMAGE) | xargs -r docker rm -f
+	@docker images $(DOCKER_IMAGE) -q | xargs -r docker rmi -f
+	@rm -rf docker-data
+	@echo "Docker cleanup complete"
+
+## docker-push: Push Docker images to registry
+docker-push:
+	@if [ -z "$(DOCKER_REGISTRY)" ]; then \
+		echo "Error: DOCKER_REGISTRY not set. Use: make docker-push DOCKER_REGISTRY=your-registry.com"; \
+		exit 1; \
+	fi
+	@echo "Pushing Docker images to $(DOCKER_REGISTRY)..."
+	docker tag $(DOCKER_IMAGE_MINIMAL) $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_MINIMAL)
+	docker tag $(DOCKER_IMAGE_FULL) $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_FULL)
+	docker push $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_MINIMAL)
+	docker push $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_FULL)
+	@echo "Docker images pushed to registry"
+
+## docker-push-all: Push all Docker image tags to registry
+docker-push-all: docker-push
+	@echo "Pushing all tags to $(DOCKER_REGISTRY)..."
+	docker tag $(DOCKER_IMAGE):latest-minimal $(DOCKER_REGISTRY)/$(DOCKER_IMAGE):latest-minimal
+	docker tag $(DOCKER_IMAGE):latest $(DOCKER_REGISTRY)/$(DOCKER_IMAGE):latest
+	docker push $(DOCKER_REGISTRY)/$(DOCKER_IMAGE):latest-minimal
+	docker push $(DOCKER_REGISTRY)/$(DOCKER_IMAGE):latest
+	@echo "All tags pushed to registry"
+
+## compose-up: Start services with Docker Compose (minimal)
+compose-up:
+	@echo "Starting services with Docker Compose..."
+	$(DOCKER_COMPOSE) -f $(DOCKER_COMPOSE_FILE) up -d raid-server
+	@echo "Services started. Access at http://localhost:8080"
+
+## compose-up-full: Start all services with Docker Compose (full stack)
+compose-up-full:
+	@echo "Starting full stack with Docker Compose..."
+	$(DOCKER_COMPOSE) -f $(DOCKER_COMPOSE_FILE) --profile full up -d
+	@echo "Full stack started:"
+	@echo "  - RAiD (file): http://localhost:8080"
+	@echo "  - RAiD (git): http://localhost:8081"
+	@echo "  - CockroachDB UI: http://localhost:8082"
+	@echo "  - RAiD (cockroach): http://localhost:8083"
+
+## compose-down: Stop all Docker Compose services
+compose-down:
+	@echo "Stopping Docker Compose services..."
+	$(DOCKER_COMPOSE) -f $(DOCKER_COMPOSE_FILE) --profile full down
+	@echo "Services stopped"
+
+## compose-logs: Show Docker Compose logs
+compose-logs:
+	$(DOCKER_COMPOSE) -f $(DOCKER_COMPOSE_FILE) logs -f
+
+## compose-ps: Show Docker Compose service status
+compose-ps:
+	$(DOCKER_COMPOSE) -f $(DOCKER_COMPOSE_FILE) ps
+
+## compose-restart: Restart Docker Compose services
+compose-restart:
+	@echo "Restarting Docker Compose services..."
+	$(DOCKER_COMPOSE) -f $(DOCKER_COMPOSE_FILE) restart
+	@echo "Services restarted"
+
+## compose-build: Build Docker Compose images
+compose-build:
+	@echo "Building Docker Compose images..."
+	$(DOCKER_COMPOSE) -f $(DOCKER_COMPOSE_FILE) build
+	@echo "Images built"
 
 ## mod-tidy: Tidy and verify dependencies
 mod-tidy:

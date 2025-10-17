@@ -1,0 +1,139 @@
+# Docker Compose configuration for go-RAiD development and testing
+
+version: '3.8'
+
+services:
+  # RAiD server with file storage (minimal)
+  raid-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VERSION: dev
+    image: go-raid:dev
+    container_name: raid-server
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_PORT=8080
+      - SERVER_HOST=0.0.0.0
+      - STORAGE_TYPE=file
+      - STORAGE_FILE_DATADIR=/app/data
+    volumes:
+      - raid-data:/app/data
+    networks:
+      - raid-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  # RAiD server with file-git storage
+  raid-server-git:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VERSION: dev
+    image: go-raid:dev
+    container_name: raid-server-git
+    ports:
+      - "8081:8080"
+    environment:
+      - SERVER_PORT=8080
+      - SERVER_HOST=0.0.0.0
+      - STORAGE_TYPE=file-git
+      - STORAGE_FILE_DATADIR=/app/data
+      - GIT_USER_NAME=RAiD Server
+      - GIT_USER_EMAIL=raid@example.com
+    volumes:
+      - raid-git-data:/app/data
+    networks:
+      - raid-network
+    restart: unless-stopped
+    profiles:
+      - full
+
+  # CockroachDB single node for testing
+  cockroachdb:
+    image: cockroachdb/cockroach:v23.1.11
+    container_name: raid-cockroachdb
+    command: start-single-node --insecure --listen-addr=0.0.0.0:26257
+    ports:
+      - "26257:26257"
+      - "8082:8080"  # CockroachDB admin UI
+    volumes:
+      - cockroach-data:/cockroach/cockroach-data
+    networks:
+      - raid-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health?ready=1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    profiles:
+      - full
+      - cockroach
+
+  # RAiD server with CockroachDB storage
+  raid-server-cockroach:
+    build:
+      context: .
+      dockerfile: Dockerfile.full
+      args:
+        VERSION: dev
+    image: go-raid:dev-full
+    container_name: raid-server-cockroach
+    ports:
+      - "8083:8080"
+    environment:
+      - SERVER_PORT=8080
+      - SERVER_HOST=0.0.0.0
+      - STORAGE_TYPE=cockroach
+      - STORAGE_COCKROACH_HOST=cockroachdb
+      - STORAGE_COCKROACH_PORT=26257
+      - STORAGE_COCKROACH_DATABASE=raid
+      - STORAGE_COCKROACH_USER=root
+      - STORAGE_COCKROACH_SSLMODE=disable
+    networks:
+      - raid-network
+    depends_on:
+      cockroachdb:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles:
+      - full
+      - cockroach
+
+  # FoundationDB (requires special setup - see documentation)
+  # foundationdb:
+  #   image: foundationdb/foundationdb:7.1.27
+  #   container_name: raid-fdb
+  #   ports:
+  #     - "4500:4500"
+  #   volumes:
+  #     - fdb-data:/var/fdb/data
+  #   networks:
+  #     - raid-network
+  #   restart: unless-stopped
+  #   profiles:
+  #     - full
+  #     - fdb
+
+volumes:
+  raid-data:
+    driver: local
+  raid-git-data:
+    driver: local
+  cockroach-data:
+    driver: local
+  # fdb-data:
+  #   driver: local
+
+networks:
+  raid-network:
+    driver: bridge
