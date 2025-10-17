@@ -1,5 +1,6 @@
 # Binaries
 go-RAiD
+raid-server
 *.exe
 *.dll
 *.so

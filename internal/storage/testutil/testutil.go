@@ -18,7 +18,7 @@ import (
 
 type MockRepository struct {
 	mu sync.RWMutex
-	
+
 	// RAiD operations
 	CreateRAiDFunc         func(context.Context, *models.RAiD) (*models.RAiD, error)
 	GetRAiDFunc            func(context.Context, string, string) (*models.RAiD, error)
@@ -29,18 +29,18 @@ type MockRepository struct {
 	GetRAiDHistoryFunc     func(context.Context, string, string) ([]*models.RAiD, error)
 	DeleteRAiDFunc         func(context.Context, string, string) error
 	GenerateIdentifierFunc func(context.Context, int64) (string, string, error)
-	
+
 	// ServicePoint operations
 	CreateServicePointFunc func(context.Context, *models.ServicePoint) (*models.ServicePoint, error)
 	GetServicePointFunc    func(context.Context, int64) (*models.ServicePoint, error)
 	UpdateServicePointFunc func(context.Context, int64, *models.ServicePoint) (*models.ServicePoint, error)
 	ListServicePointsFunc  func(context.Context) ([]*models.ServicePoint, error)
 	DeleteServicePointFunc func(context.Context, int64) error
-	
+
 	// Repository operations
 	CloseFunc       func() error
 	HealthCheckFunc func(context.Context) error
-	
+
 	// Call counters
 	CreateRAiDCalls         int
 	GetRAiDCalls            int
@@ -49,7 +49,7 @@ type MockRepository struct {
 	ListRAiDsCalls          int
 	GetRAiDHistoryCalls     int
 	GenerateIdentifierCalls int
-	
+
 	CreateServicePointCalls int
 	GetServicePointCalls    int
 	UpdateServicePointCalls int
@@ -233,7 +233,7 @@ var _ storage.Repository = (*MockRepository)(nil)
 func NewTestRAiD(prefix, suffix string) *models.RAiD {
 	now := time.Now()
 	id := fmt.Sprintf("https://raid.org/%s/%s", prefix, suffix)
-	
+
 	return &models.RAiD{
 		Identifier: &models.Identifier{
 			ID:        id,
@@ -340,13 +340,13 @@ func AssertRAiDEqual(t *testing.T, expected, actual *models.RAiD) {
 	}
 	if expected.Identifier != nil && actual.Identifier != nil {
 		if expected.Identifier.ID != actual.Identifier.ID {
-			t.Errorf("Identifier mismatch: expected=%s, actual=%s", 
+			t.Errorf("Identifier mismatch: expected=%s, actual=%s",
 				expected.Identifier.ID, actual.Identifier.ID)
 		}
 	}
 	// Compare title count
 	if len(expected.Title) != len(actual.Title) {
-		t.Errorf("Title count mismatch: expected=%d, actual=%d", 
+		t.Errorf("Title count mismatch: expected=%d, actual=%d",
 			len(expected.Title), len(actual.Title))
 	}
 }

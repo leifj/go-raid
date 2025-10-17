@@ -1,3 +1,5 @@
+// +build !noexternal
+
 package fdb
 
 import (

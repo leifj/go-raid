@@ -1,3 +1,5 @@
+// +build !noexternal
+
 package cockroach
 
 import (
